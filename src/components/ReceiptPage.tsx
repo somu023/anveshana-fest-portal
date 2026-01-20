@@ -1,5 +1,8 @@
-import React from 'react';
-import { ArrowLeft, Download, CheckCircle, QrCode } from 'lucide-react';
+import React from "react";
+import { ArrowLeft, Download, CheckCircle, QrCode } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import QRCodeLib from "qrcode";
 
 interface ReceiptPageProps {
   registrationData: any;
@@ -8,23 +11,23 @@ interface ReceiptPageProps {
   onBackToHome: () => void;
 }
 
-const eventNames: { [key: string]: string } = {
-  hackathon: 'Hackathon',
-  paper: 'Paper Presentation',
-  quiz: 'Quiz',
-  poster: 'Poster Presentation',
-  singing: 'Singing',
-  dancing: 'Dancing',
-  skit: 'Skit',
-  ramp: 'Ramp Walk',
-  treasure: 'Treasure Hunt',
-  lucky: 'Lucky Draw',
-  coding: 'Coding Contest',
-  debugging: 'Debugging Contest',
-  gaming: 'Online Gaming'
+const eventNames: Record<string, string> = {
+  hackathon: "Hackathon",
+  paper: "Paper Presentation",
+  quiz: "Quiz",
+  poster: "Poster Presentation",
+  singing: "Singing",
+  dancing: "Dancing",
+  skit: "Skit",
+  ramp: "Ramp Walk",
+  treasure: "Treasure Hunt",
+  lucky: "Lucky Draw",
+  coding: "Coding Contest",
+  debugging: "Debugging Contest",
+  gaming: "Online Gaming",
 };
 
-const eventPrices: { [key: string]: number } = {
+const eventPrices: Record<string, number> = {
   hackathon: 150,
   paper: 100,
   quiz: 50,
@@ -37,12 +40,186 @@ const eventPrices: { [key: string]: number } = {
   lucky: 50,
   coding: 100,
   debugging: 80,
-  gaming: 120
+  gaming: 120,
 };
 
-export function ReceiptPage({ registrationData, selectedEvents, paymentData, onBackToHome }: ReceiptPageProps) {
-  const handleDownload = () => {
-    alert('Receipt download will start... (Demo)');
+export function ReceiptPage({
+  registrationData,
+  selectedEvents,
+  paymentData,
+  onBackToHome,
+}: ReceiptPageProps) {
+  const handleDownload = async () => {
+    const doc = new jsPDF("p", "mm", "a4");
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    const txn = paymentData?.transactionId || "TXN-NA";
+    const paidAmount = Number(paymentData?.amount || 0);
+    const method = paymentData?.method || "-";
+
+    const dateTime = paymentData?.timestamp
+      ? new Date(paymentData.timestamp).toLocaleString("en-IN", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      : "-";
+
+    // ✅ Generate QR image (base64)
+    const verifyUrl = `https://anveshana-fest-portal.vercel.app/verify/${txn}`;
+    const qrDataUrl = await QRCodeLib.toDataURL(verifyUrl);
+
+
+    // ✅ Header
+    doc.setFillColor(20, 20, 35);
+    doc.rect(0, 0, pageWidth, 30, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(15);
+    doc.text("ANVESHANA 2026 – PAYMENT RECEIPT", pageWidth / 2, 18, {
+      align: "center",
+    });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(220, 220, 220);
+    doc.text("Tech & Cultural Fest", pageWidth / 2, 25, { align: "center" });
+
+    // ✅ Transaction Box
+    doc.setDrawColor(180);
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(14, 38, pageWidth - 28, 22, 3, 3, "FD");
+
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(11);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Transaction ID:", 18, 48);
+    doc.setFont("courier", "normal");
+    doc.text(txn, 55, 48);
+
+    doc.setFont("helvetica", "bold");
+    doc.text("Date & Time:", 18, 56);
+    doc.setFont("helvetica", "normal");
+    doc.text(dateTime, 55, 56);
+
+    // ✅ Student Details
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(30, 30, 30);
+    doc.text("Student Details", 14, 72);
+
+    const studentRows = [
+      ["Name", String(registrationData?.name || "-")],
+      ["Email", String(registrationData?.email || "-")],
+      ["Mobile", String(registrationData?.phone || "-")],
+      ["College", String(registrationData?.college || "-")],
+      ["Department", String(registrationData?.department || "-")],
+      ["Semester", String(registrationData?.semester || "-")],
+    ];
+
+    autoTable(doc, {
+      startY: 76,
+      head: [["Field", "Value"]],
+      body: studentRows,
+      theme: "grid",
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+        font: "helvetica",
+      },
+      headStyles: {
+        fillColor: [60, 120, 200],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 45 },
+        1: { cellWidth: pageWidth - 28 - 45 },
+      },
+    });
+
+    // ✅ Events
+    const finalY1 = (doc as any).lastAutoTable.finalY || 100;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Registered Events", 14, finalY1 + 12);
+
+    const eventRows = selectedEvents.map((id, idx) => {
+      const priceValue = eventPrices[id] || 0;
+      return [
+        String(idx + 1),
+        String(eventNames[id] || id),
+        `Rs.${priceValue}`, // ✅ safe format (no superscript bug)
+      ];
+    });
+
+    autoTable(doc, {
+      startY: finalY1 + 16,
+      head: [["S.No", "Event", "Price"]],
+      body: eventRows,
+      theme: "grid",
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+        font: "helvetica",
+      },
+      headStyles: {
+        fillColor: [20, 180, 150],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 15 },
+        1: { cellWidth: 110 },
+        2: { cellWidth: 35, halign: "right", font: "courier", fontStyle: "bold" },
+      },
+    });
+
+    // ✅ Total Paid box
+    const finalY2 = (doc as any).lastAutoTable.finalY || finalY1 + 50;
+
+    doc.setFillColor(235, 240, 255);
+    doc.roundedRect(14, finalY2 + 10, pageWidth - 28, 22, 3, 3, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
+    doc.setTextColor(20, 20, 20);
+    doc.text("Total Amount Paid:", 18, finalY2 + 23);
+
+    doc.setFont("courier", "bold");
+    doc.text(`Rs.${paidAmount}`, pageWidth - 20, finalY2 + 23, { align: "right" });
+    doc.setFont("helvetica", "normal");
+
+    doc.setFontSize(10);
+    doc.setTextColor(70, 70, 70);
+    doc.text(`Payment Method: ${method}`, 18, finalY2 + 30);
+
+    // ✅ QR Section
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 30, 30);
+    doc.setFontSize(11);
+    doc.text("QR Verification:", 14, finalY2 + 45);
+
+    // ✅ Add QR image
+    doc.addImage(qrDataUrl, "PNG", 14, finalY2 + 50, 35, 35);
+
+    doc.setFont("courier", "normal");
+    doc.setFontSize(9);
+    doc.text(txn, 55, finalY2 + 70);
+
+    // ✅ Footer Note
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(90, 90, 90);
+    doc.setFontSize(9);
+    doc.text(
+      "Note: Please carry this receipt and your College ID on fest day.",
+      14,
+      finalY2 + 92
+    );
+
+    doc.save(`Anveshana_Receipt_${txn}.pdf`);
   };
 
   return (
@@ -57,7 +234,7 @@ export function ReceiptPage({ registrationData, selectedEvents, paymentData, onB
             <ArrowLeft className="w-5 h-5" />
             Back to Home
           </button>
-          
+
           <div className="flex items-center gap-3 mb-4">
             <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
               <CheckCircle className="w-7 h-7 text-white" />
@@ -66,126 +243,34 @@ export function ReceiptPage({ registrationData, selectedEvents, paymentData, onB
               Registration Complete!
             </h1>
           </div>
-          <p className="text-gray-400 text-lg">Your payment has been confirmed. Here's your receipt.</p>
+
+          <p className="text-gray-400 text-lg">
+            Your payment has been confirmed. Here's your receipt.
+          </p>
         </div>
 
-        {/* Receipt Card */}
+        {/* Receipt UI */}
         <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden">
-          {/* Receipt Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-8">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-white mb-2">Anveshana 2026</h2>
-              <p className="text-purple-100">Tech & Cultural Fest</p>
-              <p className="text-purple-200 text-sm mt-2">Payment Receipt</p>
-            </div>
+          <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-8 text-center">
+            <h2 className="text-3xl font-bold text-white mb-2">
+              Anveshana 2026
+            </h2>
+            <p className="text-purple-100">Tech & Cultural Fest</p>
+            <p className="text-purple-200 text-sm mt-2">Payment Receipt</p>
           </div>
 
-          {/* Receipt Body */}
           <div className="p-8">
-            {/* Transaction Info */}
-            <div className="bg-gray-800/50 rounded-xl p-6 mb-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Transaction ID</p>
-                  <p className="font-mono text-white font-semibold">{paymentData?.transactionId}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Date & Time</p>
-                  <p className="text-white">
-                    {new Date(paymentData?.timestamp).toLocaleString('en-IN', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short'
-                    })}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Participant Details */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <div className="w-1 h-6 bg-gradient-to-b from-purple-500 to-blue-500 rounded"></div>
-                Participant Details
-              </h3>
-              <div className="grid grid-cols-2 gap-4 bg-gray-800/30 rounded-xl p-6">
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Name</p>
-                  <p className="text-white font-medium">{registrationData?.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Email</p>
-                  <p className="text-white font-medium">{registrationData?.email}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">College</p>
-                  <p className="text-white font-medium">{registrationData?.college}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Department</p>
-                  <p className="text-white font-medium">{registrationData?.department}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Semester</p>
-                  <p className="text-white font-medium">{registrationData?.semester}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400 mb-1">Mobile</p>
-                  <p className="text-white font-medium">{registrationData?.phone}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Registered Events */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <div className="w-1 h-6 bg-gradient-to-b from-purple-500 to-blue-500 rounded"></div>
-                Registered Events
-              </h3>
-              <div className="bg-gray-800/30 rounded-xl p-6">
-                {selectedEvents.map((eventId, index) => (
-                  <div
-                    key={eventId}
-                    className={`flex items-center justify-between py-3 ${
-                      index < selectedEvents.length - 1 ? 'border-b border-gray-700/50' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-gradient-to-br from-purple-600/30 to-blue-600/30 rounded-full flex items-center justify-center border border-purple-500/30">
-                        <span className="text-sm text-purple-300 font-semibold">{index + 1}</span>
-                      </div>
-                      <span className="text-white font-medium">{eventNames[eventId]}</span>
-                    </div>
-                    <span className="text-gray-300">₹{eventPrices[eventId]}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Amount Details */}
-            <div className="bg-gradient-to-br from-purple-600/10 to-blue-600/10 border border-purple-500/30 rounded-xl p-6 mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-gray-300">Total Amount Paid</span>
-                <span className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                  ₹{paymentData?.amount}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-400">Payment Method</span>
-                <span className="text-gray-300 capitalize">{paymentData?.method}</span>
-              </div>
-            </div>
-
-            {/* QR Code */}
             <div className="flex items-center justify-center mb-6">
               <div className="bg-white p-6 rounded-xl">
                 <div className="w-32 h-32 bg-gray-200 flex items-center justify-center">
                   <QrCode className="w-20 h-20 text-gray-400" />
                 </div>
-                <p className="text-center text-xs text-gray-600 mt-2">Scan for verification</p>
+                <p className="text-center text-xs text-gray-600 mt-2">
+                  Scan for verification
+                </p>
               </div>
             </div>
 
-            {/* Download Button */}
             <button
               onClick={handleDownload}
               className="w-full py-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2"
@@ -194,10 +279,9 @@ export function ReceiptPage({ registrationData, selectedEvents, paymentData, onB
               Download PDF Receipt
             </button>
 
-            {/* Footer Note */}
             <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
               <p className="text-sm text-yellow-200 text-center">
-                📧 A copy of this receipt has been sent to your email. Please carry this receipt and your college ID on the event day.
+                ✅ Please carry this receipt and your college ID on event day.
               </p>
             </div>
           </div>
