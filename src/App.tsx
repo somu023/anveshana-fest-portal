@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { HeroSection } from './components/HeroSection';
 import { FestDetailsSection } from './components/FestDetailsSection';
 import { EventsSection } from './components/EventsSection';
@@ -40,32 +41,41 @@ export default function App() {
 
   if (currentPage === 'register') {
     return (
-      <RegistrationFlow 
-        onComplete={handleRegistrationComplete}
-        onBack={handleBackToHome}
-      />
+      <>
+        <RegistrationFlow 
+          onComplete={handleRegistrationComplete}
+          onBack={handleBackToHome}
+        />
+        <Analytics />
+      </>
     );
   }
 
   if (currentPage === 'payment') {
     return (
-      <PaymentPage 
-        selectedEvents={selectedEvents}
-        registrationData={registrationData}
-        onComplete={handlePaymentComplete}
-        onBack={handleBackToHome}
-      />
+      <>
+        <PaymentPage 
+          selectedEvents={selectedEvents}
+          registrationData={registrationData}
+          onComplete={handlePaymentComplete}
+          onBack={handleBackToHome}
+        />
+        <Analytics />
+      </>
     );
   }
 
   if (currentPage === 'receipt') {
     return (
-      <ReceiptPage 
-        registrationData={registrationData}
-        selectedEvents={selectedEvents}
-        paymentData={paymentData}
-        onBackToHome={handleBackToHome}
-      />
+      <>
+        <ReceiptPage 
+          registrationData={registrationData}
+          selectedEvents={selectedEvents}
+          paymentData={paymentData}
+          onBackToHome={handleBackToHome}
+        />
+        <Analytics />
+      </>
     );
   }
 
@@ -77,6 +87,7 @@ export default function App() {
       <VideosSection />
       <ContactSection />
       <Footer onRegisterClick={handleRegisterClick} />
+      <Analytics />
     </div>
   );
 }
