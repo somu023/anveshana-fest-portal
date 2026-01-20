@@ -65,8 +65,20 @@ export function ReceiptPage({
       : "-";
 
     // ✅ Generate QR image (base64)
-    const verifyUrl = `https://anveshana-fest-portal.vercel.app/verify/${txn}`;
-    const qrDataUrl = await QRCodeLib.toDataURL(verifyUrl);
+   const qrText = `
+   ANVESHANA 2026 - PAYMENT RECEIPT
+   TXN: ${txn}
+   Name: ${registrationData?.name || "-"}
+   Phone: ${registrationData?.phone || "-"}
+   College: ${registrationData?.college || "-"}
+   Dept: ${registrationData?.department || "-"}
+   Sem: ${registrationData?.semester || "-"}
+   Events: ${selectedEvents.map((id: string) => eventNames[id]).join(", ")}
+   Amount: Rs.${paidAmount}
+   Status: SUCCESS
+`;
+
+const qrDataUrl = await QRCodeLib.toDataURL(qrText.trim());
 
 
     // ✅ Header
